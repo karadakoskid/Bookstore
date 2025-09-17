@@ -11,9 +11,15 @@ app = Flask(__name__)
 
 # --- SESSION & CORS CONFIG FOR CROSS-ORIGIN AUTH ---
 # Use HTTPS and correct SameSite policy for production/cloud (like Render)
+# Detect if we're in production (Render uses HTTPS)
+is_production = os.getenv("RENDER") is not None or os.getenv("FRONTEND_URL", "").startswith("https://")
+
 app.config.update(
-    SESSION_COOKIE_SAMESITE="None",   # allow cross-site cookies
-    SESSION_COOKIE_SECURE=False       # not required for local development
+    SESSION_COOKIE_SAMESITE="None",        # allow cross-site cookies
+    SESSION_COOKIE_SECURE=is_production,   # True for HTTPS (production), False for HTTP (local)
+    SESSION_COOKIE_HTTPONLY=True,          # security: prevent XSS
+    SESSION_COOKIE_DOMAIN=None,            # let browser handle domain
+    PERMANENT_SESSION_LIFETIME=3600        # 1 hour session timeout
 )
 # Allow both local and deployed frontend origins (including Render)
 # Get frontend URL from environment variable for production
