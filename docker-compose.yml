@@ -1,0 +1,43 @@
+version: '3'
+
+services:
+  mongodb:
+    image: mongo:6
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - bookstore-network
+
+  backend:
+    build: ./backend
+    restart: always
+    environment:
+      - MONGO_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/bookstore?authSource=admin
+      - SECRET_KEY=${SECRET_KEY}
+    ports:
+      - "5050:5050"
+    depends_on:
+      - mongodb
+    networks:
+      - bookstore-network
+
+  frontend:
+    build: ./bookstore-frontend
+    restart: always
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - bookstore-network
+
+networks:
+  bookstore-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

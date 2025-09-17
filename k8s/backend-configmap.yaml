@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: bookstore
+data:
+  DATABASE_NAME: "bookstore"
+  BACKEND_PORT: "5050"
