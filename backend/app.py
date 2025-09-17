@@ -122,6 +122,10 @@ def logged_in():
     return "username" in session
 
 def get_current_user():
+    # Check if we have user from token authentication
+    if hasattr(request, 'current_user'):
+        return request.current_user
+    # Fallback to session
     return session.get("username")
 
 # ----------------- API: User Authentication -----------------
@@ -212,12 +216,10 @@ def api_list_books():
     return jsonify(books)
 
 @app.route("/api/books", methods=["POST"])
+@token_required
 def api_add_book():
     print(f"DEBUG: Add book request - Session data: {dict(session)}")
     print(f"DEBUG: Request headers: {dict(request.headers)}")
-    if not logged_in():
-        print("DEBUG: User not logged in - returning 401")
-        return jsonify({"error": "Login required!"}), 401
     
     data = request.json
     title = data.get("title")
@@ -241,10 +243,8 @@ def api_add_book():
     return jsonify({"message": "Book added successfully!", "id": str(book_id)}), 201
 
 @app.route("/api/books/<book_id>", methods=["PUT"])
+@token_required
 def api_edit_book(book_id):
-    if not logged_in():
-        return jsonify({"error": "Login required!"}), 401
-    
     data = request.json
     
     # Verify user owns this book
@@ -271,10 +271,8 @@ def api_edit_book(book_id):
     return jsonify({"message": "Book updated successfully!"})
 
 @app.route("/api/books/<book_id>", methods=["DELETE"])
+@token_required
 def api_delete_book(book_id):
-    if not logged_in():
-        return jsonify({"error": "Login required!"}), 401
-    
     # Verify user owns this book
     book = mongo.db.books.find_one({"_id": ObjectId(book_id)})
     if not book:
