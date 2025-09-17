@@ -15,13 +15,22 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="None",   # allow cross-site cookies
     SESSION_COOKIE_SECURE=False       # not required for local development
 )
-# Allow both local and deployed frontend origins
-CORS(app, supports_credentials=True, origins=[
+# Allow both local and deployed frontend origins (including Render)
+# Get frontend URL from environment variable for production
+frontend_urls = [
     "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3001", 
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001"
-])
+]
+
+# Add production frontend URL if available
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    frontend_urls.append(frontend_url)
+    frontend_urls.append(frontend_url.replace("http://", "https://"))  # Add HTTPS version
+
+CORS(app, supports_credentials=True, origins=frontend_urls)
 
 mongo_uri = os.environ["MONGO_URI"]
 app.config["MONGO_URI"] = mongo_uri
