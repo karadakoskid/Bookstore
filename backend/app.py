@@ -32,10 +32,22 @@ if frontend_url:
 
 CORS(app, supports_credentials=True, origins=frontend_urls)
 
-mongo_uri = os.environ["MONGO_URI"]
+# MongoDB configuration with error handling
+mongo_uri = os.getenv("MONGO_URI")
+if not mongo_uri:
+    print("ERROR: MONGO_URI environment variable is not set!")
+    raise ValueError("MONGO_URI environment variable is required")
+
 app.config["MONGO_URI"] = mongo_uri
 app.secret_key = os.getenv("SECRET_KEY", "supersecret")
-mongo = PyMongo(app)
+
+# Initialize MongoDB with error handling
+try:
+    mongo = PyMongo(app)
+    print(f"MongoDB connection initialized successfully")
+except Exception as e:
+    print(f"ERROR: Failed to initialize MongoDB: {e}")
+    raise
 
 def logged_in():
     return "username" in session
@@ -46,21 +58,32 @@ def get_current_user():
 # ----------------- API: User Authentication -----------------
 @app.route("/api/register", methods=["POST"])
 def api_register():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
-    
-    # Check if username exists
-    if mongo.db.users.find_one({"username": username}):
-        return jsonify({"error": "Username already taken!"}), 400
-    
-    # Create new user
-    user_id = mongo.db.users.insert_one({
-        "username": username,
-        "password": generate_password_hash(password)
-    }).inserted_id
-    
-    return jsonify({"message": "User registered successfully!"}), 201
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        username = data.get("username")
+        password = data.get("password")
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+        
+        # Check if username exists
+        if mongo.db.users.find_one({"username": username}):
+            return jsonify({"error": "Username already taken!"}), 400
+        
+        # Create new user
+        user_id = mongo.db.users.insert_one({
+            "username": username,
+            "password": generate_password_hash(password)
+        }).inserted_id
+        
+        return jsonify({"message": "User registered successfully!"}), 201
+        
+    except Exception as e:
+        print(f"ERROR in register endpoint: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
