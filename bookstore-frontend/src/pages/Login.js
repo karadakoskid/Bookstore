@@ -18,6 +18,13 @@ function Login({ setUser }) {
     
     try {
       const response = await API.post("/login", { username, password });
+      
+      // Store token and username in localStorage
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      localStorage.setItem('username', response.data.username);
+      
       setUser(response.data.username);
       navigate("/");
     } catch (err) {
