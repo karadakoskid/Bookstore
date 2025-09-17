@@ -5,6 +5,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 import os
+import jwt
+import datetime
+from functools import wraps
+import jwt
+import datetime
+from functools import wraps
 
 load_dotenv()
 app = Flask(__name__)
@@ -55,7 +61,64 @@ except Exception as e:
     print(f"ERROR: Failed to initialize MongoDB: {e}")
     raise
 
+# Token authentication decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            # Fallback to session-based auth
+            if "username" in session:
+                return f(*args, **kwargs)
+            return jsonify({'error': 'Token or session required'}), 401
+        
+        try:
+            # Remove 'Bearer ' prefix if present
+            if token.startswith('Bearer '):
+                token = token[7:]
+            
+            data = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+            current_user = data['username']
+            request.current_user = current_user
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        return f(*args, **kwargs)
+    return decorated
+
+# Token authentication decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            # Fallback to session-based auth
+            if "username" in session:
+                return f(*args, **kwargs)
+            return jsonify({'error': 'Token or session required'}), 401
+        
+        try:
+            # Remove 'Bearer ' prefix if present
+            if token.startswith('Bearer '):
+                token = token[7:]
+            
+            data = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+            current_user = data['username']
+            request.current_user = current_user
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        return f(*args, **kwargs)
+    return decorated
+
 def logged_in():
+    print(f"DEBUG: Checking session - keys: {list(session.keys())}")
+    print(f"DEBUG: Session ID: {session.get('_id', 'No session ID')}")
+    print(f"DEBUG: Username in session: {'username' in session}")
     return "username" in session
 
 def get_current_user():
@@ -93,14 +156,40 @@ def api_register():
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
-    user = mongo.db.users.find_one({"username": username})
-    if user and check_password_hash(user["password"], password):
-        session["username"] = username
-        return jsonify({"message": "Logged in!", "username": username})
-    return jsonify({"error": "Invalid credentials!"}), 401
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        username = data.get("username")
+        password = data.get("password")
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+        
+        user = mongo.db.users.find_one({"username": username})
+        if user and check_password_hash(user["password"], password):
+            # Set session
+            session["username"] = username
+            
+            # Generate JWT token
+            token = jwt.encode({
+                'username': username,
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+            }, app.secret_key, algorithm='HS256')
+            
+            print(f"DEBUG: Login successful for {username}, session set, token generated")
+            return jsonify({
+                "message": "Logged in!", 
+                "username": username,
+                "token": token
+            })
+        
+        return jsonify({"error": "Invalid credentials!"}), 401
+        
+    except Exception as e:
+        print(f"ERROR in login endpoint: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
@@ -124,7 +213,10 @@ def api_list_books():
 
 @app.route("/api/books", methods=["POST"])
 def api_add_book():
+    print(f"DEBUG: Add book request - Session data: {dict(session)}")
+    print(f"DEBUG: Request headers: {dict(request.headers)}")
     if not logged_in():
+        print("DEBUG: User not logged in - returning 401")
         return jsonify({"error": "Login required!"}), 401
     
     data = request.json
