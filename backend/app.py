@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session, make_response
 from flask_pymongo import PyMongo
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -33,7 +33,8 @@ frontend_urls = [
     "http://localhost:3000",
     "http://localhost:3001", 
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001"
+    "http://127.0.0.1:3001",
+    "http://bookstore.local"
 ]
 
 # Add production frontend URL if available
@@ -42,7 +43,40 @@ if frontend_url:
     frontend_urls.append(frontend_url)
     frontend_urls.append(frontend_url.replace("http://", "https://"))  # Add HTTPS version
 
-CORS(app, supports_credentials=True, origins=frontend_urls)
+print(f"DEBUG: Configured CORS origins: {frontend_urls}")
+
+# Simple CORS configuration that should work
+CORS(app, 
+     origins=frontend_urls,
+     supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+# Manual CORS headers as backup
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    print(f"DEBUG: Request origin: {origin}")
+    if origin in frontend_urls:
+        print(f"DEBUG: Adding CORS headers for origin: {origin}")
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+# Add explicit OPTIONS handlers
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    origin = request.headers.get('Origin')
+    if origin in frontend_urls:
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    return '', 404
 
 # MongoDB configuration with error handling
 mongo_uri = os.getenv("MONGO_URI")

@@ -1,10 +1,29 @@
 import axios from 'axios';
 
-// Use environment variable for API URL, with production fallback
-const API_URL = process.env.REACT_APP_API_URL || 
-               (window.location.hostname === 'localhost' 
-                 ? 'http://localhost:5050/api' 
-                 : 'https://bookstore-backend-tlao.onrender.com/api');
+// Use environment variable for API URL, with fallback logic for different environments
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  
+  // Local development (localhost:3000 or localhost:3001)
+  if (hostname === 'localhost') {
+    return 'http://localhost:5050/api';
+  }
+  
+  // Kubernetes ingress (bookstore.local)
+  if (hostname === 'bookstore.local') {
+    return 'http://bookstore.local/api';
+  }
+  
+  // Render production (default fallback)
+  return 'https://bookstore-backend-tlao.onrender.com/api';
+};
+
+const API_URL = getApiUrl();
 
 const API = axios.create({
   baseURL: API_URL,
