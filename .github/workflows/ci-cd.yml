@@ -27,7 +27,7 @@ jobs:
         run: docker build -t $IMAGE_NAME_BACKEND:latest ./backend
 
       - name: Build frontend Docker image
-        run: docker build -t $IMAGE_NAME_FRONTEND:latest ./cookwithlove-frontend
+        run: docker build -t $IMAGE_NAME_FRONTEND:latest ./bookstore-frontend
 
       - name: Push backend Docker image
         run: docker push $IMAGE_NAME_BACKEND:latest
@@ -58,3 +58,6 @@ jobs:
           else
             echo "No frontend deploy hook set, skipping deployment."
           fi
+
+# dasdad
+
